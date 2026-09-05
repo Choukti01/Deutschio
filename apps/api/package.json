@@ -1,0 +1,23 @@
+{
+  "name": "deutschio-api",
+  "version": "1.0.0",
+  "description": "Deutschio backend",
+  "main": "dist/server.js",
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": { "node": ">=20.0.0" },
+  "scripts": { "dev": "tsx watch src/server.ts", "build": "tsc", "start": "node dist/server.js", "typecheck": "tsc --noEmit", "seed": "tsx src/seed.ts" },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.19.2",
+    "express-rate-limit": "8.7.0",
+    "helmet": "8.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.5.0",
+    "resend": "^6.7.0",
+    "zod": "4.5.4"
+  },
+  "devDependencies": { "@types/cors": "2.8.19", "@types/express": "5.0.6", "@types/jsonwebtoken": "9.0.10", "@types/node": "26.4.1", "tsx": "4.23.13", "typescript": "7.0.2" }
+}

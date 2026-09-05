@@ -5,7 +5,17 @@
   "type": "module",
   "packageManager": "pnpm@11.19.0",
   "engines": { "node": ">=20.19.0" },
-  "scripts": { "dev": "vite", "build": "tsc -b && vite build", "preview": "vite preview", "typecheck": "tsc -b --pretty false" },
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "pnpm --filter deutschio-api dev",
+    "dev:all": "pnpm --parallel --filter deutschio-web --filter deutschio-api dev",
+    "build": "tsc -b && vite build",
+    "build:api": "pnpm --filter deutschio-api build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --pretty false",
+    "typecheck:api": "pnpm --filter deutschio-api typecheck",
+    "test:api": "pnpm --filter deutschio-api test"
+  },
   "dependencies": { "lucide-react": "1.40.0", "react": "19.2.8", "react-dom": "19.2.8" },
   "devDependencies": { "@types/react": "19.2.18", "@types/react-dom": "19.2.7", "@vitejs/plugin-react": "6.1.1", "typescript": "7.0.2", "vite": "8.2.2" }
 }
