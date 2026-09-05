@@ -1,4 +1,4 @@
-# DDeutschio
+# Deutschio
 
 One modern repository for the Deutschio learning product.
 
@@ -8,13 +8,13 @@ One modern repository for the Deutschio learning product.
 ## Start locally
 
 ```powershell
-pnpm install
+npm install
 Copy-Item apps/api/.env.example apps/api/.env
-pnpm dev:all
+npm run dev
 ```
 
-The web app runs at `http://127.0.0.1:5173` and proxies `/api` to the API at
-`http://127.0.0.1:3000`.
+The web app runs at `http://127.0.0.1:5173`. To run the API in a second VS
+Code terminal, use `npm run dev:api`; it runs at `http://127.0.0.1:3000`.
 
 ## Production
 
