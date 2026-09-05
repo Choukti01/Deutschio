@@ -45,10 +45,8 @@ button:disabled {
 
 /* Deutschio's mark is a speech-inspired D: a compact, recognizable icon at every size. */
 .brand { gap: 0; }
-.brand-logo { display: inline-flex; align-items: center; gap: 9px; }
-.brand-mark { width: 39px; height: 39px; display: block; background: transparent; filter: drop-shadow(0 6px 14px #d6ff5830); }
-.brand-wordmark { display: inline-flex; align-items: baseline; color: #f4f7ef; font: 850 20px/1 "Manrope", sans-serif; letter-spacing: -.055em; }
-.brand-wordmark span:last-child { color: var(--lime); }
+.brand-logo { width: 164px; height: 62px; display: block; object-fit: contain; mix-blend-mode: screen; }
+.site-footer .brand-logo { width: 144px; height: 55px; }
 
 .brand-button,
 .menu-button,

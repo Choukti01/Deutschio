@@ -32,7 +32,7 @@ import {
   type Account,
   type RemoteLesson,
 } from "./api";
-import brandMark from "./assets/deutschio-mark.svg";
+import brandLogo from "./assets/deutschio-logo.png";
 import { courses, getCourse, getLesson, type Course, type Lesson, type LessonStatus } from "./content";
 
 type View = "home" | "dashboard" | "course" | "lesson" | "pricing" | "login" | "signup";
@@ -255,7 +255,7 @@ export function App() {
 }
 
 function BrandLogo() {
-  return <span className="brand-logo" aria-hidden="true"><img className="brand-mark" src={brandMark} alt="" /><span className="brand-wordmark"><span>Deutsch</span><span>io</span></span></span>;
+  return <img className="brand-logo" src={brandLogo} alt="Deutschio" />;
 }
 
 function Header({ view, menuOpen, signedIn, account, onMenu, onNavigate, onSignOut }: { view: View; menuOpen: boolean; signedIn: boolean; account: Account | null; onMenu: () => void; onNavigate: (view: View) => void; onSignOut: () => void }) {
