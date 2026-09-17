@@ -13,8 +13,8 @@ Copy-Item apps/api/.env.example apps/api/.env
 npm run dev
 ```
 
-The web app runs at `http://127.0.0.1:5173`. To run the API in a second VS
-Code terminal, use `npm run dev:api`; it runs at `http://127.0.0.1:3000`.
+`npm run dev` starts the web app at `http://127.0.0.1:5173` and the API at
+`http://127.0.0.1:3000`. Press `Ctrl+C` once to stop both.
 
 ## Production
 
