@@ -1,4 +1,6 @@
 node_modules/
+.postgres/
+apps/api/package-lock.json
 dist/
 .env
 .env.*
