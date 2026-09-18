@@ -1,8 +1,9 @@
 import { spawn } from "node:child_process";
 
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const npmCli = process.env.npm_execpath;
+if (!npmCli) throw new Error("npm_execpath is required to start the development services");
 const commands = ["dev:web", "dev:api"];
-const children = commands.map((script) => spawn(npm, ["run", script], { stdio: "inherit" }));
+const children = commands.map((script) => spawn(process.execPath, [npmCli, "run", script], { stdio: "inherit" }));
 
 const stop = (signal) => {
   for (const child of children) child.kill(signal);

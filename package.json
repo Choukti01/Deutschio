@@ -9,12 +9,12 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:web": "vite",
-    "dev:api": "npm run dev --workspace=@deutschio/api",
+    "dev:api": "npm run dev --prefix apps/api --workspaces=false",
     "build": "tsc -b && vite build",
-    "build:api": "npm run build --workspace=@deutschio/api",
+    "build:api": "npm run build --prefix apps/api --workspaces=false",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false",
-    "typecheck:api": "npm run typecheck --workspace=@deutschio/api"
+    "typecheck:api": "npm run typecheck --prefix apps/api --workspaces=false"
   },
   "dependencies": { "lucide-react": "1.40.0", "react": "19.2.8", "react-dom": "19.2.8" },
   "devDependencies": { "@types/react": "19.2.18", "@types/react-dom": "19.2.7", "@vitejs/plugin-react": "6.1.1", "typescript": "7.0.2", "vite": "8.2.2" }
