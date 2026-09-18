@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
-import { Types } from "mongoose";
 import { env } from "../config.js";
-import { Session } from "../models/Session.js";
+import { id, query } from "../db.js";
 
 const sessionLifetimeMs = env.SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 
@@ -21,12 +20,7 @@ export async function createSession(userId: string) {
   const token = crypto.randomBytes(32).toString("base64url");
   const csrfToken = crypto.randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + sessionLifetimeMs);
-  await Session.create({
-    user: new Types.ObjectId(userId),
-    tokenHash: hashToken(token),
-    csrfTokenHash: hashToken(csrfToken),
-    expiresAt,
-  });
+  await query("INSERT INTO sessions (id, user_id, token_hash, csrf_token_hash, expires_at) VALUES ($1, $2, $3, $4, $5)", [id(), userId, hashToken(token), hashToken(csrfToken), expiresAt]);
   return { token, csrfToken, expiresAt, maxAge: sessionLifetimeMs };
 }
 
@@ -37,30 +31,21 @@ export type ActiveSession = {
 };
 
 export async function getActiveSession(token: string): Promise<ActiveSession | null> {
-  const session = await Session.findOne({
-    tokenHash: hashToken(token),
-    expiresAt: { $gt: new Date() },
-    revokedAt: { $exists: false },
-  }).select("+csrfTokenHash");
-  if (!session) return null;
-  await Session.updateOne({ _id: session._id }, { $set: { lastSeenAt: new Date() } });
-  return { id: session.id, userId: session.user.toString(), csrfTokenHash: session.csrfTokenHash };
+  const result = await query<{ id: string; user_id: string; csrf_token_hash: string }>("UPDATE sessions SET last_seen_at = now() WHERE token_hash = $1 AND expires_at > now() AND revoked_at IS NULL RETURNING id, user_id, csrf_token_hash", [hashToken(token)]);
+  const session = result.rows[0];
+  return session ? { id: session.id, userId: session.user_id, csrfTokenHash: session.csrf_token_hash } : null;
 }
 
 export async function revokeSession(token: string) {
-  await Session.updateOne({ tokenHash: hashToken(token), revokedAt: { $exists: false } }, { $set: { revokedAt: new Date() } });
+  await query("UPDATE sessions SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL", [hashToken(token)]);
 }
 
 export async function revokeAllSessionsForUser(userId: string) {
-  await Session.updateMany({ user: new Types.ObjectId(userId), revokedAt: { $exists: false } }, { $set: { revokedAt: new Date() } });
+  await query("UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL", [userId]);
 }
 
 export async function rotateCsrfToken(sessionId: string) {
   const csrfToken = crypto.randomBytes(32).toString("base64url");
-  const updated = await Session.findByIdAndUpdate(
-    sessionId,
-    { $set: { csrfTokenHash: hashToken(csrfToken) } },
-    { new: true },
-  );
-  return updated ? csrfToken : null;
+  const updated = await query("UPDATE sessions SET csrf_token_hash = $1 WHERE id = $2 AND expires_at > now() AND revoked_at IS NULL", [hashToken(csrfToken), sessionId]);
+  return updated.rowCount ? csrfToken : null;
 }

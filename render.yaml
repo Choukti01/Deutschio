@@ -9,7 +9,7 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: MONGO_URI
+      - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
         sync: false

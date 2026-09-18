@@ -1,15 +1,10 @@
-import { Types } from "mongoose";
-import { Entitlement, type EntitlementKey } from "../models/Entitlement.js";
+import { query } from "../db.js";
+
+export type EntitlementKey = "premium";
 
 export async function hasActiveEntitlement(userId: string, key: EntitlementKey) {
-  const now = new Date();
-  return Boolean(await Entitlement.exists({
-    user: new Types.ObjectId(userId),
-    key,
-    startsAt: { $lte: now },
-    revokedAt: { $exists: false },
-    $or: [{ endsAt: { $exists: false } }, { endsAt: null }, { endsAt: { $gt: now } }],
-  }));
+  const result = await query("SELECT 1 FROM entitlements WHERE user_id = $1 AND key = $2 AND starts_at <= now() AND revoked_at IS NULL AND (ends_at IS NULL OR ends_at > now()) LIMIT 1", [userId, key]);
+  return Boolean(result.rowCount);
 }
 
 export async function canAccessContent(userId: string, access: "free" | "premium") {

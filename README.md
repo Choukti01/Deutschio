@@ -28,7 +28,7 @@ Create a Render Web Service from this repository's `main` branch. The included
 production defaults. Add the remaining values in Render's Environment page:
 
 ```text
-MONGO_URI=<MongoDB connection string>
+DATABASE_URL=<Supabase PostgreSQL connection string>
 JWT_SECRET=<unique random value, at least 32 characters>
 APP_URL=https://api.ddeutschio.online
 WEB_URL=https://www.ddeutschio.online

@@ -1,97 +1,44 @@
 import { Router } from "express";
 import { z } from "zod";
-import { Course } from "../models/Course.js";
-import { Enrollment } from "../models/Enrollment.js";
-import { Lesson } from "../models/Lesson.js";
-import { LessonProgress } from "../models/LessonProgress.js";
-import { User } from "../models/User.js";
+import { publicUser, query, type UserRow } from "../db.js";
 import { requireAuth, requireCsrf, type AuthenticatedRequest } from "../middleware/auth.js";
 import { hasActiveEntitlement } from "../services/access.js";
 
 export const meRouter = Router();
-
-const profileSchema = z.object({
-  name: z.string().trim().min(1).max(80).optional(),
-  avatarUrl: z.string().url().max(2_000).or(z.literal("")).optional(),
-  notes: z.array(z.object({
-    text: z.string().trim().min(1).max(2_000),
-    createdAt: z.coerce.date().optional(),
-  })).max(100).optional(),
-}).strict().refine((value) => Object.keys(value).length > 0, { message: "Provide at least one profile field" });
-
-type PublicUserSource = {
-  _id: { toString(): string };
-  email: string;
-  emailVerified: boolean;
-  name: string;
-  avatarUrl: string;
-  notes: unknown;
-  plan: string;
-  createdAt: Date;
-};
-
-function publicUser(user: PublicUserSource) {
-  return {
-    id: user._id.toString(),
-    email: user.email,
-    emailVerified: user.emailVerified,
-    name: user.name,
-    avatarUrl: user.avatarUrl,
-    notes: user.notes,
-    plan: user.plan,
-    createdAt: user.createdAt,
-  };
-}
+const profileSchema = z.object({ name: z.string().trim().min(1).max(80).optional(), avatarUrl: z.string().url().max(2_000).or(z.literal("")).optional(), notes: z.array(z.object({ text: z.string().trim().min(1).max(2_000), createdAt: z.coerce.date().optional() })).max(100).optional() }).strict().refine((value) => Object.keys(value).length > 0, { message: "Provide at least one profile field" });
+const userColumns = "id, email, password_hash, email_verified, verification_token_hash, verification_token_expires_at, name, avatar_url, notes, plan, created_at";
 
 meRouter.get("/profile", requireAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const user = await User.findById(req.userId);
+    const user = (await query<UserRow>(`SELECT ${userColumns} FROM users WHERE id = $1`, [req.userId])).rows[0];
     if (!user) return res.status(404).json({ error: { code: "USER_NOT_FOUND", message: "Account not found" } });
     res.set("Cache-Control", "no-store");
     return res.json({ user: publicUser(user) });
-  } catch (error) {
-    return next(error);
-  }
+  } catch (error) { return next(error); }
 });
 
 meRouter.patch("/profile", requireAuth, requireCsrf, async (req: AuthenticatedRequest, res, next) => {
   try {
     const input = profileSchema.parse(req.body);
-    const user = await User.findByIdAndUpdate(req.userId, { $set: input }, { new: true, runValidators: true });
+    const user = (await query<UserRow>(`UPDATE users SET name = COALESCE($2, name), avatar_url = COALESCE($3, avatar_url), notes = COALESCE($4::jsonb, notes), updated_at = now() WHERE id = $1 RETURNING ${userColumns}`, [req.userId, input.name ?? null, input.avatarUrl ?? null, input.notes === undefined ? null : JSON.stringify(input.notes)])).rows[0];
     if (!user) return res.status(404).json({ error: { code: "USER_NOT_FOUND", message: "Account not found" } });
     res.set("Cache-Control", "no-store");
     return res.json({ user: publicUser(user) });
-  } catch (error) {
-    return next(error);
-  }
+  } catch (error) { return next(error); }
 });
 
 meRouter.get("/dashboard", requireAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const [courses, enrollments, progress, premium] = await Promise.all([
-      Course.find({ published: true }).sort({ position: 1 }).lean(),
-      Enrollment.find({ user: req.userId }).lean(),
-      LessonProgress.find({ user: req.userId }).lean(),
+    const [courses, enrollments, completed, premium] = await Promise.all([
+      query<{ id: string; slug: string; title: string; cefr_level: string; access: string; total: string; completed: string }>("SELECT c.id, c.slug, c.title, c.cefr_level, c.access, COUNT(l.id)::text AS total, COUNT(lp.id) FILTER (WHERE lp.status = 'completed')::text AS completed FROM courses c LEFT JOIN lessons l ON l.course_id = c.id AND l.published = true LEFT JOIN lesson_progress lp ON lp.lesson_id = l.id AND lp.user_id = $1 WHERE c.published = true GROUP BY c.id ORDER BY c.position", [req.userId]),
+      query<{ course_id: string; started_at: Date; completed_at: Date | null }>("SELECT course_id, started_at, completed_at FROM enrollments WHERE user_id = $1", [req.userId]),
+      query<{ slug: string }>("SELECT l.slug FROM lesson_progress lp JOIN lessons l ON l.id = lp.lesson_id WHERE lp.user_id = $1 AND lp.status = 'completed'", [req.userId]),
       hasActiveEntitlement(req.userId!, "premium"),
     ]);
-    const lessons = await Lesson.find({ course: { $in: courses.map((course) => course._id) }, published: true }).lean();
-    const completedByLesson = new Map(progress.filter((item) => item.status === "completed").map((item) => [item.lesson.toString(), item]));
-    const lessonsByCourse = new Map<string, typeof lessons>();
-    for (const lesson of lessons) {
-      const key = lesson.course.toString();
-      lessonsByCourse.set(key, [...(lessonsByCourse.get(key) ?? []), lesson]);
-    }
     return res.json({
-      access: { premium },
-      completedLessonSlugs: lessons
-        .filter((lesson) => completedByLesson.has(lesson._id.toString()))
-        .map((lesson) => lesson.slug),
-      enrollments: enrollments.map((enrollment) => ({ courseId: enrollment.course.toString(), startedAt: enrollment.startedAt, completedAt: enrollment.completedAt })),
-      courses: courses.map((course) => {
-        const courseLessons = lessonsByCourse.get(course._id.toString()) ?? [];
-        const completed = courseLessons.filter((lesson) => completedByLesson.has(lesson._id.toString())).length;
-        return { id: course._id.toString(), slug: course.slug, title: course.title, cefrLevel: course.cefrLevel, access: course.access, progress: { completed, total: courseLessons.length, percent: courseLessons.length ? Math.round((completed / courseLessons.length) * 100) : 0 } };
-      }),
+      access: { premium }, completedLessonSlugs: completed.rows.map((row) => row.slug),
+      enrollments: enrollments.rows.map((row) => ({ courseId: row.course_id, startedAt: row.started_at, completedAt: row.completed_at })),
+      courses: courses.rows.map((row) => { const total = Number(row.total); const completedCount = Number(row.completed); return { id: row.id, slug: row.slug, title: row.title, cefrLevel: row.cefr_level, access: row.access, progress: { completed: completedCount, total, percent: total ? Math.round((completedCount / total) * 100) : 0 } }; }),
     });
-  } catch (error) { next(error); }
+  } catch (error) { return next(error); }
 });

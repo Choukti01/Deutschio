@@ -8,7 +8,7 @@ const booleanFromEnvironment = z.enum(["true", "false"]).transform((value) => va
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
-  MONGO_URI: z.string().min(1),
+  DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(32),
   APP_URL: z.string().url(),
   WEB_URL: z.string().url().default("http://localhost:5173"),
