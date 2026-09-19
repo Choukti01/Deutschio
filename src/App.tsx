@@ -61,6 +61,8 @@ function speakGerman(text: string) {
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "de-DE";
+  const germanVoice = window.speechSynthesis.getVoices().find((voice) => /^de(?:-|_)/i.test(voice.lang));
+  if (germanVoice) utterance.voice = germanVoice;
   utterance.rate = 0.84;
   window.speechSynthesis.speak(utterance);
 }
