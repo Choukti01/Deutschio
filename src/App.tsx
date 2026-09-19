@@ -36,6 +36,7 @@ import {
 import brandLogo from "./assets/deutschio-logo.png";
 import { courses, getCourse, getLesson, type Course, type Lesson, type LessonStatus } from "./content";
 import { a1Lessons as a1Catalog } from "../apps/api/src/content/a1";
+import { a2Lessons as a2Catalog } from "../apps/api/src/content/a2";
 import { b1Lessons as b1Catalog } from "../apps/api/src/content/b1";
 
 type View = "home" | "dashboard" | "course" | "lesson" | "pricing" | "login" | "signup";
@@ -350,7 +351,7 @@ function LessonPlayer({ course, lesson, signedIn, learningLanguage, onBack, onCo
     return () => { active = false; };
   }, [lesson.id, signedIn]);
 
-  const localCatalogLesson = [...a1Catalog, ...b1Catalog].find((candidate) => candidate.slug === lesson.id);
+  const localCatalogLesson = [...a1Catalog, ...a2Catalog, ...b1Catalog].find((candidate) => candidate.slug === lesson.id);
   const localCatalogExercise = localCatalogLesson?.exercises[0];
   const localPrompt = prompts[lesson.id] ?? fallbackPrompt;
   const remoteExercise = remoteLesson?.exercises[0];
