@@ -4,6 +4,9 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # The production runtime uses NODE_ENV=production, but Vite and TypeScript
+  # are build-time dev dependencies and must be installed in Netlify's builder.
+  NPM_CONFIG_INCLUDE = "dev"
 
 [[redirects]]
   from = "/health"
