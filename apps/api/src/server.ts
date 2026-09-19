@@ -116,7 +116,7 @@ app.post("/api/v1/auth/login", authLimiter, async (req, res, next) => {
     if (!user || !passwordMatches) return res.status(401).json({ error: { code: "INVALID_CREDENTIALS", message: "Email or password is incorrect" } });
     if (!user.email_verified) return res.status(403).json({ error: { code: "EMAIL_NOT_VERIFIED", message: "Verify your email before signing in" } });
     const session = await createSession(user.id); setSessionCookie(res, session.token, session.maxAge);
-    const token = env.LEGACY_BEARER_AUTH ? jwt.sign({}, env.JWT_SECRET, { subject: user.id, expiresIn: "15m", issuer: "deutschio-api", audience: "deutschio-web" }) : undefined;
+    const token = env.LEGACY_BEARER_AUTH ? jwt.sign({}, env.JWT_SECRET!, { subject: user.id, expiresIn: "15m", issuer: "deutschio-api", audience: "deutschio-web" }) : undefined;
     res.set("Cache-Control", "no-store"); return res.json({ user: publicUser(user), csrfToken: session.csrfToken, ...(token ? { token } : {}) });
   } catch (error) { return next(error); }
 });

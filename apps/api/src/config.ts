@@ -9,7 +9,9 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().url(),
-  JWT_SECRET: z.string().min(32),
+  // Cookie sessions are the default authentication mechanism. A JWT secret is
+  // only needed when deliberately enabling the legacy bearer-token bridge.
+  JWT_SECRET: z.string().min(32).optional(),
   APP_URL: z.string().url(),
   WEB_URL: z.string().url().default("http://localhost:5173"),
   CORS_ORIGINS: z.string().optional(),
@@ -32,6 +34,9 @@ const schema = z.object({
   }
   if (value.NODE_ENV === "production" && !value.COOKIE_SECURE) {
     context.addIssue({ code: "custom", message: "COOKIE_SECURE must be true in production" });
+  }
+  if (value.LEGACY_BEARER_AUTH && !value.JWT_SECRET) {
+    context.addIssue({ code: "custom", message: "JWT_SECRET is required when LEGACY_BEARER_AUTH is enabled" });
   }
 });
 

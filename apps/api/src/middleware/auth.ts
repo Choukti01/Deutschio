@@ -54,7 +54,8 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     const token = env.LEGACY_BEARER_AUTH ? bearerToken(req) : undefined;
     if (token) {
       try {
-        const payload = jwt.verify(token, env.JWT_SECRET, {
+        // Config validates this when legacy bearer authentication is enabled.
+        const payload = jwt.verify(token, env.JWT_SECRET!, {
           algorithms: ["HS256"],
           issuer: "deutschio-api",
           audience: "deutschio-web",
