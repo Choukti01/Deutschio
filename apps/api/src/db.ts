@@ -17,12 +17,17 @@ const usesLocalPostgres = ["localhost", "127.0.0.1", "::1"].includes(url.hostnam
 // serverless trust store cannot currently verify. Keep TLS encryption on and
 // limit this compatibility exception to the official pooler hostname.
 const usesSupabasePooler = /(?:^|\.)pooler\.supabase\.com$/i.test(url.hostname);
+
+// `pg` lets `sslmode` embedded in a connection URI override the `ssl` option
+// below. Supabase's pooler URI contains `sslmode=require`, so remove that URI
+// directive and make this module the single source of truth for TLS behaviour.
+url.searchParams.delete("sslmode");
 const isServerless =
   process.env.DEUTSCHIO_SERVERLESS === "true" ||
   process.env.NETLIFY === "true" ||
   process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined;
 export const pool = new Pool({
-  connectionString: env.DATABASE_URL,
+  connectionString: url.toString(),
   ssl: usesLocalPostgres ? false : { rejectUnauthorized: !usesSupabasePooler },
   // Serverless runtimes can create multiple warm instances. A small pool per
   // instance keeps the shared Supabase connection limit healthy as traffic
