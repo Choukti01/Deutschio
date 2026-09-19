@@ -356,15 +356,18 @@ function LessonPlayer({ course, lesson, signedIn, learningLanguage, onBack, onCo
   const localPrompt = prompts[lesson.id] ?? fallbackPrompt;
   const remoteExercise = remoteLesson?.exercises[0];
   const activeExercise = remoteExercise ?? localCatalogExercise;
+  // API responses deliberately omit the answer key. It is available only for
+  // local preview content, while signed-in attempts are marked by the server.
+  const localAnswer = remoteExercise ? undefined : localCatalogExercise?.answer;
   const displayBlocks = remoteLesson?.blocks ?? localCatalogLesson?.blocks;
   const prompt: PracticePrompt = activeExercise
     ? { german: activeExercise.prompt, translation: "", options: activeExercise.options.map((option) => option.id), tip: activeExercise.explanation[learningLanguage] }
     : localPrompt;
   const options = activeExercise ? activeExercise.options.map((option) => ({ value: option.id, label: option.translations[learningLanguage] })) : prompt.options.map((option) => ({ value: option, label: option }));
   const vocabulary = remoteLesson?.blocks.flatMap((block) => block.items ?? []) ?? localCatalogLesson?.blocks.flatMap((block) => block.type === "vocabulary" ? block.items : []) ?? lesson.vocabulary.map((german) => ({ german, translations: { en: german, ar: german } }));
-  const correct = serverResult?.correct ?? selected === (activeExercise?.answer ?? prompt.translation);
+  const correct = serverResult?.correct ?? selected === (localAnswer ?? prompt.translation);
   const explanation = serverResult?.explanation[learningLanguage] ?? prompt.tip;
-  const correctAnswerLabel = activeExercise?.options.find((option) => option.id === activeExercise.answer)?.translations[learningLanguage] ?? prompt.translation;
+  const correctAnswerLabel = activeExercise?.options.find((option) => option.id === localAnswer)?.translations[learningLanguage] ?? prompt.translation;
 
   const checkAnswer = async () => {
     if (!selected) return;
@@ -399,7 +402,7 @@ function LessonPlayer({ course, lesson, signedIn, learningLanguage, onBack, onCo
       <div><small>{remoteLesson ? "Saved lesson activity" : "Lesson preview"}</small><div className="lesson-progress"><span /></div></div>
     </header>
     {displayBlocks?.length ? <section className="lesson-content" aria-label="Lesson content">
-      {displayBlocks.map((block, index) => <div className="lesson-content-block" key={`${block.type}-${block.title ?? block.text ?? index}`}>
+      {displayBlocks.map((block, index) => <div className="lesson-content-block" key={`${block.type}-${block.type === "heading" ? block.title : block.type === "paragraph" ? block.text : index}`}>
         {block.type === "heading" && block.title ? <h2>{block.title}</h2> : null}
         {block.type === "paragraph" && block.text ? <p>{block.text}</p> : null}
         {block.type === "vocabulary" && block.items ? <dl>{block.items.map((item) => <div key={item.german}><dt>{item.german}</dt><dd>{item.translations[learningLanguage]}</dd></div>)}</dl> : null}
