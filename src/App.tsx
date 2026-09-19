@@ -35,6 +35,7 @@ import {
 } from "./api";
 import brandLogo from "./assets/deutschio-logo.png";
 import { courses, getCourse, getLesson, type Course, type Lesson, type LessonStatus } from "./content";
+import { a1Lessons as a1Catalog } from "../apps/api/src/content/a1";
 
 type View = "home" | "dashboard" | "course" | "lesson" | "pricing" | "login" | "signup";
 type PracticePrompt = { german: string; translation: string; options: string[]; tip: string };
@@ -43,7 +44,6 @@ type RouteState = { view: View; courseCode: string; lessonId: string | null };
 const prompts: Record<string, PracticePrompt> = {
   "a1-greetings": { german: "Guten Morgen", translation: "Good morning", options: ["Good morning", "Good evening", "Goodbye", "Thank you"], tip: "Use Guten Morgen before midday. It is polite but completely normal in daily conversation." },
   "a1-introductions": { german: "Wie heißt du?", translation: "What is your name?", options: ["Where are you from?", "What is your name?", "How are you?", "Nice to meet you"], tip: "Use du with people you know, friends and most peers. Formal German uses Sie." },
-  "a1-simple-questions": { german: "Wie geht's dir?", translation: "How are you?", options: ["Where do you live?", "How are you?", "What time is it?", "What is that?"], tip: "The shortened form geht's is natural in spoken German." },
   "a1-family": { german: "die Mutter", translation: "mother", options: ["sister", "mother", "daughter", "grandmother"], tip: "Nouns are written with a capital letter in German. Learn their article with every new word." },
   "a1-numbers": { german: "zehn", translation: "ten", options: ["seven", "ten", "twelve", "twenty"], tip: "German number words are one word; get comfortable hearing their rhythm early." },
   "a1-days": { german: "morgen", translation: "tomorrow", options: ["morning", "yesterday", "tomorrow", "Monday"], tip: "Morgen can mean tomorrow. Der Morgen means the morning." },
@@ -349,15 +349,20 @@ function LessonPlayer({ course, lesson, signedIn, learningLanguage, onBack, onCo
     return () => { active = false; };
   }, [lesson.id, signedIn]);
 
+  const localCatalogLesson = a1Catalog.find((candidate) => candidate.slug === lesson.id);
+  const localCatalogExercise = localCatalogLesson?.exercises[0];
   const localPrompt = prompts[lesson.id] ?? fallbackPrompt;
   const remoteExercise = remoteLesson?.exercises[0];
-  const prompt: PracticePrompt = remoteExercise
-    ? { german: remoteExercise.prompt, translation: "", options: remoteExercise.options.map((option) => option.id), tip: remoteExercise.explanation[learningLanguage] }
+  const activeExercise = remoteExercise ?? localCatalogExercise;
+  const displayBlocks = remoteLesson?.blocks ?? localCatalogLesson?.blocks;
+  const prompt: PracticePrompt = activeExercise
+    ? { german: activeExercise.prompt, translation: "", options: activeExercise.options.map((option) => option.id), tip: activeExercise.explanation[learningLanguage] }
     : localPrompt;
-  const options = remoteExercise ? remoteExercise.options.map((option) => ({ value: option.id, label: option.translations[learningLanguage] })) : prompt.options.map((option) => ({ value: option, label: option }));
-  const vocabulary = remoteLesson?.blocks.flatMap((block) => block.items ?? []) ?? lesson.vocabulary.map((german) => ({ german, translations: { en: german, ar: german } }));
-  const correct = serverResult?.correct ?? selected === prompt.translation;
+  const options = activeExercise ? activeExercise.options.map((option) => ({ value: option.id, label: option.translations[learningLanguage] })) : prompt.options.map((option) => ({ value: option, label: option }));
+  const vocabulary = remoteLesson?.blocks.flatMap((block) => block.items ?? []) ?? localCatalogLesson?.blocks.flatMap((block) => block.type === "vocabulary" ? block.items : []) ?? lesson.vocabulary.map((german) => ({ german, translations: { en: german, ar: german } }));
+  const correct = serverResult?.correct ?? selected === (activeExercise?.answer ?? prompt.translation);
   const explanation = serverResult?.explanation[learningLanguage] ?? prompt.tip;
+  const correctAnswerLabel = activeExercise?.options.find((option) => option.id === activeExercise.answer)?.translations[learningLanguage] ?? prompt.translation;
 
   const checkAnswer = async () => {
     if (!selected) return;
@@ -391,8 +396,8 @@ function LessonPlayer({ course, lesson, signedIn, learningLanguage, onBack, onCo
       <span>{course.code} · {remoteLesson?.title ?? lesson.title}</span>
       <div><small>{remoteLesson ? "Saved lesson activity" : "Lesson preview"}</small><div className="lesson-progress"><span /></div></div>
     </header>
-    {remoteLesson?.blocks.length ? <section className="lesson-content" aria-label="Lesson content">
-      {remoteLesson.blocks.map((block, index) => <div className="lesson-content-block" key={`${block.type}-${block.title ?? block.text ?? index}`}>
+    {displayBlocks?.length ? <section className="lesson-content" aria-label="Lesson content">
+      {displayBlocks.map((block, index) => <div className="lesson-content-block" key={`${block.type}-${block.title ?? block.text ?? index}`}>
         {block.type === "heading" && block.title ? <h2>{block.title}</h2> : null}
         {block.type === "paragraph" && block.text ? <p>{block.text}</p> : null}
         {block.type === "vocabulary" && block.items ? <dl>{block.items.map((item) => <div key={item.german}><dt>{item.german}</dt><dd>{item.translations[learningLanguage]}</dd></div>)}</dl> : null}
@@ -403,9 +408,9 @@ function LessonPlayer({ course, lesson, signedIn, learningLanguage, onBack, onCo
       <button type="button" className="audio-button" onClick={() => speakGerman(prompt.german)} aria-label={`Play pronunciation for ${prompt.german}`}><Volume2 /></button>
       <h1>{prompt.german}</h1>
       <p className="lesson-instruction">Choose the most natural {learningLanguage === "ar" ? "Arabic" : "English"} meaning.</p>
-      <div className="answer-options">{options.map((option) => <button type="button" key={option.value} className={`${selected === option.value ? "selected" : ""} ${checked && correct && (remoteLesson ? option.value === selected : option.value === prompt.translation) ? "correct" : ""} ${checked && selected === option.value && !correct ? "incorrect" : ""}`} disabled={checked || checking} onClick={() => setSelected(option.value)}><span>{option.label}</span>{checked && correct && (remoteLesson ? option.value === selected : option.value === prompt.translation) && <Check />}</button>)}</div>
+      <div className="answer-options">{options.map((option) => <button type="button" key={option.value} className={`${selected === option.value ? "selected" : ""} ${checked && correct && option.value === selected ? "correct" : ""} ${checked && selected === option.value && !correct ? "incorrect" : ""}`} disabled={checked || checking} onClick={() => setSelected(option.value)}><span>{option.label}</span>{checked && correct && option.value === selected && <Check />}</button>)}</div>
       {attemptError && <p className="auth-message error" role="alert">{attemptError}</p>}
-      {checked ? <div className={`feedback ${correct ? "success" : "retry"}`}><div>{correct ? <CheckCircle2 /> : <Sparkles />}</div><div><strong>{correct ? "Exactly right." : "Almost — keep going."}</strong><p>{correct ? explanation : remoteLesson ? explanation : `The correct answer is “${prompt.translation}”. ${explanation}`}</p></div></div> : null}
+      {checked ? <div className={`feedback ${correct ? "success" : "retry"}`}><div>{correct ? <CheckCircle2 /> : <Sparkles />}</div><div><strong>{correct ? "Exactly right." : "Almost — keep going."}</strong><p>{correct ? explanation : remoteLesson ? explanation : `The correct answer is “${correctAnswerLabel}”. ${explanation}`}</p></div></div> : null}
       <div className="lesson-actions">{checked ? correct ? <button className="primary-button" onClick={onComplete}>Finish lesson <ArrowRight /></button> : <button className="secondary-button" onClick={retry}>Try again <ArrowRight /></button> : <button className="primary-button" disabled={!selected || checking} onClick={() => void checkAnswer()}>{checking ? "Saving answer…" : "Check answer"}<ArrowRight /></button>}</div>
       {!signedIn && <p className="lesson-save-note">Create a free account to save your lesson progress across devices.</p>}
     </article>
