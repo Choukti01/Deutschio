@@ -9,9 +9,9 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().url(),
-  // PEM-encoded database CA for managed PostgreSQL providers. This keeps TLS
-  // certificate verification enabled in serverless production environments.
-  DATABASE_CA: z.string().optional(),
+  // Base64-encoded database CA for managed PostgreSQL providers. Using a
+  // single-line value makes it safe to store in a serverless secret manager.
+  DATABASE_CA_BASE64: z.string().optional(),
   // Cookie sessions are the default authentication mechanism. A JWT secret is
   // only needed when deliberately enabling the legacy bearer-token bridge.
   JWT_SECRET: z.string().min(32).optional(),

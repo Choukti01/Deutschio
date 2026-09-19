@@ -13,13 +13,16 @@ export type LessonRow = { id: string; course_id: string; slug: string; title: st
 
 const url = new URL(env.DATABASE_URL);
 const usesLocalPostgres = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+const databaseCa = env.DATABASE_CA_BASE64
+  ? Buffer.from(env.DATABASE_CA_BASE64, "base64").toString("utf8")
+  : undefined;
 const isServerless =
   process.env.DEUTSCHIO_SERVERLESS === "true" ||
   process.env.NETLIFY === "true" ||
   process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined;
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
-  ssl: usesLocalPostgres ? false : { rejectUnauthorized: true, ...(env.DATABASE_CA ? { ca: env.DATABASE_CA } : {}) },
+  ssl: usesLocalPostgres ? false : { rejectUnauthorized: true, ...(databaseCa ? { ca: databaseCa } : {}) },
   // Serverless runtimes can create multiple warm instances. A small pool per
   // instance keeps the shared Supabase connection limit healthy as traffic
   // grows, while local development still has a comfortable pool size.
