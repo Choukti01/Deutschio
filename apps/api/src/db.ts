@@ -52,7 +52,76 @@ export async function query<T extends QueryResultRow = QueryResultRow>(text: str
   return pool.query<T>(text, values);
 }
 
+async function upgradeLegacyUsersTable() {
+  const currentId = await query<{ data_type: string }>(`
+    SELECT data_type
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'id'
+  `);
+  const idType = currentId.rows[0]?.data_type;
+  if (!idType) return;
+
+  // The original Deutschio prototype stored numeric user ids plus a PIN. Keep
+  // those rows and their original ids, but give every existing learner the UUID
+  // identity required by the modern authentication and progress tables.
+  const isLegacy = idType !== "uuid";
+  if (isLegacy) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("ALTER TABLE users RENAME COLUMN id TO legacy_id");
+      await client.query("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_pkey");
+      await client.query("ALTER TABLE users ADD COLUMN id uuid");
+      // Supabase Realtime may publish this legacy table. While its new UUID
+      // primary key is being populated, a temporary replica identity lets the
+      // one-time update remain valid for that publication.
+      await client.query("ALTER TABLE users REPLICA IDENTITY FULL");
+      await client.query("UPDATE users SET id = md5(legacy_id::text || clock_timestamp()::text || random()::text)::uuid WHERE id IS NULL");
+      await client.query("ALTER TABLE users ALTER COLUMN id SET NOT NULL");
+      await client.query("ALTER TABLE users ADD CONSTRAINT users_pkey PRIMARY KEY (id)");
+      await client.query("ALTER TABLE users REPLICA IDENTITY DEFAULT");
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Add the modern account fields without removing legacy columns (such as
+  // `pin`). Existing prototype accounts remain preserved but cannot be used to
+  // bypass the new password-and-email-verification flow.
+  await query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash text NOT NULL DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified boolean NOT NULL DEFAULT false;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_hash text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at timestamptz;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url text NOT NULL DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS notes jsonb NOT NULL DEFAULT '[]'::jsonb;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS learning_language text NOT NULL DEFAULT 'en';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS plan text NOT NULL DEFAULT 'free';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+  `);
+
+  if (isLegacy) {
+    await query(`
+      UPDATE users
+      SET email = COALESCE(email, 'legacy-' || legacy_id::text || '@invalid.deutschio.local'),
+          name = COALESCE(name, ''),
+          avatar_url = COALESCE(avatar_url, ''),
+          notes = COALESCE(notes, '[]'::jsonb),
+          learning_language = COALESCE(learning_language, 'en'),
+          plan = COALESCE(plan, 'free'),
+          updated_at = COALESCE(updated_at, created_at, now());
+    `);
+  }
+  await query("CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users (email) WHERE email IS NOT NULL");
+}
+
 export async function migrate() {
+  await upgradeLegacyUsersTable();
   await query(`
     CREATE TABLE IF NOT EXISTS users (
       id uuid PRIMARY KEY, email text NOT NULL UNIQUE, password_hash text NOT NULL,
