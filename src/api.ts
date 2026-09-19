@@ -76,8 +76,8 @@ async function request<T>(path: string, init: RequestInit = {}) {
   return data as T;
 }
 
-export async function signUp(email: string, password: string) {
-  return request<{ message: string; developmentVerificationUrl?: string }>("/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) });
+export async function signUp(name: string, email: string, password: string) {
+  return request<{ message: string; developmentVerificationUrl?: string }>("/auth/signup", { method: "POST", body: JSON.stringify({ name, email, password }) });
 }
 
 export async function resendVerification(email: string) {
@@ -101,6 +101,7 @@ export async function refreshCsrfToken() {
 }
 
 export async function signOut() {
+  if (!csrfToken) await refreshCsrfToken();
   await request<unknown>("/auth/logout", { method: "POST" });
   csrfToken = null;
 }

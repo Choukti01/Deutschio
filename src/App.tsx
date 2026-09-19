@@ -403,8 +403,10 @@ function Pricing({ onNavigate }: { onNavigate: (view: View) => void }) {
 
 function AuthScreen({ mode, onNavigate, onSignedIn }: { mode: "login" | "signup"; onNavigate: (view: View) => void; onSignedIn: (account: Account) => void }) {
   const isSignUp = mode === "signup";
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(new URLSearchParams(window.location.search).get("verified") ? "Your email is verified. You can sign in now." : null);
   const [pending, setPending] = useState(false);
@@ -417,15 +419,20 @@ function AuthScreen({ mode, onNavigate, onSignedIn }: { mode: "login" | "signup"
     setError(null);
     setMessage(null);
     setDevelopmentVerificationUrl(null);
+    const normalizedEmail = email.trim().toLowerCase();
+    if (isSignUp && password !== confirmPassword) {
+      setError("Your passwords do not match.");
+      return;
+    }
     setPending(true);
     try {
       if (isSignUp) {
-        const result = await signUp(email, password);
+        const result = await signUp(name.trim(), normalizedEmail, password);
         setMessage(result.message);
-        setUnverifiedEmail(email);
+        setUnverifiedEmail(normalizedEmail);
         setDevelopmentVerificationUrl(result.developmentVerificationUrl ?? null);
       } else {
-        const result = await signIn(email, password);
+        const result = await signIn(normalizedEmail, password);
         onSignedIn(result.user);
       }
     } catch (caught) {
@@ -455,10 +462,12 @@ function AuthScreen({ mode, onNavigate, onSignedIn }: { mode: "login" | "signup"
     <button className="back-button" onClick={() => onNavigate("home")}><ArrowLeft /> Back to home</button>
     <p className="eyebrow">{isSignUp ? "Start your journey" : "Welcome back"}</p>
     <h1>{isSignUp ? "Learn German, one small win at a time." : "Continue your German."}</h1>
-    <p className="auth-copy">{isSignUp ? "Create your free account to save progress and build a learning habit that lasts." : "Sign in to pick up exactly where you left off."}</p>
+    <p className="auth-copy">{isSignUp ? "Create your free account to save progress securely and build a learning habit that lasts." : "Sign in to pick up exactly where you left off."}</p>
     <form onSubmit={submit} className="auth-form">
+      {isSignUp ? <label>Your name<input type="text" autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} minLength={1} maxLength={80} required /></label> : null}
       <label>Email<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
-      <label>Password<input type="password" autoComplete={isSignUp ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} minLength={10} required />{isSignUp && <small>Use at least 10 characters.</small>}</label>
+      <label>Password<input type="password" autoComplete={isSignUp ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} minLength={isSignUp ? 12 : 10} maxLength={128} required />{isSignUp && <small>Use at least 12 characters.</small>}</label>
+      {isSignUp ? <label>Confirm password<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={12} maxLength={128} required /></label> : null}
       {error && <p className="auth-message error" role="alert">{error}</p>}
       {message && <p className="auth-message success" role="status">{message}</p>}
       <button className="primary-button" type="submit" disabled={pending}>{pending ? "One moment…" : isSignUp ? "Create free account" : "Sign in"}<ArrowRight /></button>

@@ -16,6 +16,6 @@
     "typecheck": "tsc -b --pretty false",
     "typecheck:api": "npm run typecheck --prefix apps/api --workspaces=false"
   },
-  "dependencies": { "lucide-react": "1.40.0", "react": "19.2.8", "react-dom": "19.2.8" },
+  "dependencies": { "lucide-react": "1.40.0", "react": "19.2.8", "react-dom": "19.2.8", "serverless-http": "^4.0.0" },
   "devDependencies": { "@types/react": "19.2.18", "@types/react-dom": "19.2.7", "@vitejs/plugin-react": "6.1.1", "typescript": "7.0.2", "vite": "8.2.2" }
 }

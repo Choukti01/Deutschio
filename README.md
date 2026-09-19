@@ -18,35 +18,38 @@ npm run dev
 
 ## Production
 
-- Netlify builds the React app from this repository using `netlify.toml`.
-- Render builds and starts the API from this repository using `render.yaml`.
+- Netlify deploys the React app and the Node/Express API together from this
+  repository using `netlify.toml`.
+- `/api/*` is routed internally to the Netlify Function, so the web app and
+  authenticated API share `www.ddeutschio.online`.
 
-### Render API
+### Netlify production configuration
 
-Create a Render Web Service from this repository's `main` branch. The included
-`render.yaml` supplies the build command, start command, health check, and safe
-production defaults. Add the remaining values in Render's Environment page:
+In Netlify, add these values with the **Functions** runtime scope. Do not commit
+any secret to the repository:
 
 ```text
 DATABASE_URL=<Supabase PostgreSQL connection string>
 JWT_SECRET=<unique random value, at least 32 characters>
-APP_URL=https://api.ddeutschio.online
+NODE_ENV=production
+APP_URL=https://www.ddeutschio.online
 WEB_URL=https://www.ddeutschio.online
 CORS_ORIGINS=https://www.ddeutschio.online,https://ddeutschio.online
+COOKIE_SECURE=true
+COOKIE_SAME_SITE=lax
+TRUST_PROXY=1
 RESEND_API_KEY=<Resend API key>
-EMAIL_FROM=<verified Deutschio sending address>
+EMAIL_FROM=Deutschio <noreply@ddeutschio.online>
 ```
 
-Set `api.ddeutschio.online` as the Render service's custom domain. Do not
-commit secrets or connection strings to this repository.
+For production signup verification, add `ddeutschio.online` in Resend, publish
+the exact DNS records Resend provides in Spaceship, wait for verification, then
+create a least-privilege sending API key. The API returns a clear retryable
+error if delivery is unavailable; it never claims an email was sent when it was
+not.
 
-### Netlify web app
+### Health check
 
-Set the following Netlify build environment variable, then redeploy the site:
-
-```text
-VITE_API_URL=https://api.ddeutschio.online/api/v1
-```
-
-Use `www.ddeutschio.online` as the primary web domain and redirect
-`ddeutschio.online` to it.
+After deployment, verify `https://www.ddeutschio.online/health`. The expected
+response identifies the API and PostgreSQL connection without exposing any
+secret.
