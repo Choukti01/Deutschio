@@ -1,5 +1,7 @@
 [build]
-  command = "npm run build:api && npm run build"
+  # Netlify sets NODE_ENV=production for the live service. Install each
+  # workspace's build tools explicitly before compiling TypeScript.
+  command = "npm install --prefix apps/api --include=dev --workspaces=false --package-lock=false && npm install --include=dev --workspaces=false --package-lock=false && npm run build:api && npm run build"
   publish = "dist"
 
 [build.environment]
