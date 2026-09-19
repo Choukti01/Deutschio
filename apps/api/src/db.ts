@@ -3,9 +3,11 @@ import { Pool, type QueryResultRow } from "pg";
 import { env } from "./config.js";
 
 export type Access = "free" | "premium";
-export type LessonBlock = { type: "heading" | "paragraph" | "vocabulary"; title?: string; text?: string; items?: Array<{ german: string; translation: string }> };
-export type Exercise = { id: string; kind: "multiple_choice"; prompt: string; options: string[]; answer: string; explanation: string; points: number };
-export type UserRow = { id: string; email: string; password_hash: string; email_verified: boolean; verification_token_hash: string | null; verification_token_expires_at: Date | null; name: string; avatar_url: string; notes: unknown; plan: Access; created_at: Date };
+export type LearningLanguage = "en" | "ar";
+export type Translation = Record<LearningLanguage, string>;
+export type LessonBlock = { type: "heading" | "paragraph" | "vocabulary"; title?: string; text?: string; items?: Array<{ german: string; translations: Translation }> };
+export type Exercise = { id: string; kind: "multiple_choice"; prompt: string; options: Array<{ id: string; translations: Translation }>; answer: string; explanation: Translation; points: number };
+export type UserRow = { id: string; email: string; password_hash: string; email_verified: boolean; verification_token_hash: string | null; verification_token_expires_at: Date | null; name: string; avatar_url: string; notes: unknown; learning_language: LearningLanguage; plan: Access; created_at: Date };
 export type CourseRow = { id: string; slug: string; cefr_level: "A1" | "A2" | "B1" | "B2"; title: string; description: string; access: Access; published: boolean; position: number };
 export type LessonRow = { id: string; course_id: string; slug: string; title: string; summary: string; position: number; access: Access; published: boolean; duration_minutes: number; blocks: LessonBlock[]; exercises: Exercise[] };
 
@@ -39,6 +41,7 @@ export async function migrate() {
       email_verified boolean NOT NULL DEFAULT false, verification_token_hash text,
       verification_token_expires_at timestamptz, name text NOT NULL DEFAULT '',
       avatar_url text NOT NULL DEFAULT '', notes jsonb NOT NULL DEFAULT '[]'::jsonb,
+      learning_language text NOT NULL DEFAULT 'en' CHECK (learning_language IN ('en', 'ar')),
       plan text NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'premium')),
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
     );
@@ -90,10 +93,12 @@ export async function migrate() {
     CREATE INDEX IF NOT EXISTS entitlements_active_idx ON entitlements(user_id, key, starts_at DESC) WHERE revoked_at IS NULL;
     CREATE INDEX IF NOT EXISTS lesson_progress_user_idx ON lesson_progress(user_id, lesson_id);
   `);
+  // Existing databases predate the learning-language preference column.
+  await query("ALTER TABLE users ADD COLUMN IF NOT EXISTS learning_language text NOT NULL DEFAULT 'en' CHECK (learning_language IN ('en', 'ar'))");
 }
 
 export function publicUser(user: UserRow) {
-  return { id: user.id, email: user.email, emailVerified: user.email_verified, name: user.name, avatarUrl: user.avatar_url, notes: user.notes, plan: user.plan, createdAt: user.created_at };
+  return { id: user.id, email: user.email, emailVerified: user.email_verified, name: user.name, avatarUrl: user.avatar_url, notes: user.notes, learningLanguage: user.learning_language, plan: user.plan, createdAt: user.created_at };
 }
 
 export function lessonSummary(lesson: LessonRow) {

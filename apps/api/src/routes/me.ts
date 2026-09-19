@@ -5,8 +5,8 @@ import { requireAuth, requireCsrf, type AuthenticatedRequest } from "../middlewa
 import { hasActiveEntitlement } from "../services/access.js";
 
 export const meRouter = Router();
-const profileSchema = z.object({ name: z.string().trim().min(1).max(80).optional(), avatarUrl: z.string().url().max(2_000).or(z.literal("")).optional(), notes: z.array(z.object({ text: z.string().trim().min(1).max(2_000), createdAt: z.coerce.date().optional() })).max(100).optional() }).strict().refine((value) => Object.keys(value).length > 0, { message: "Provide at least one profile field" });
-const userColumns = "id, email, password_hash, email_verified, verification_token_hash, verification_token_expires_at, name, avatar_url, notes, plan, created_at";
+const profileSchema = z.object({ name: z.string().trim().min(1).max(80).optional(), avatarUrl: z.string().url().max(2_000).or(z.literal("")).optional(), notes: z.array(z.object({ text: z.string().trim().min(1).max(2_000), createdAt: z.coerce.date().optional() })).max(100).optional(), learningLanguage: z.enum(["en", "ar"]).optional() }).strict().refine((value) => Object.keys(value).length > 0, { message: "Provide at least one profile field" });
+const userColumns = "id, email, password_hash, email_verified, verification_token_hash, verification_token_expires_at, name, avatar_url, notes, learning_language, plan, created_at";
 
 meRouter.get("/profile", requireAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
@@ -20,7 +20,7 @@ meRouter.get("/profile", requireAuth, async (req: AuthenticatedRequest, res, nex
 meRouter.patch("/profile", requireAuth, requireCsrf, async (req: AuthenticatedRequest, res, next) => {
   try {
     const input = profileSchema.parse(req.body);
-    const user = (await query<UserRow>(`UPDATE users SET name = COALESCE($2, name), avatar_url = COALESCE($3, avatar_url), notes = COALESCE($4::jsonb, notes), updated_at = now() WHERE id = $1 RETURNING ${userColumns}`, [req.userId, input.name ?? null, input.avatarUrl ?? null, input.notes === undefined ? null : JSON.stringify(input.notes)])).rows[0];
+    const user = (await query<UserRow>(`UPDATE users SET name = COALESCE($2, name), avatar_url = COALESCE($3, avatar_url), notes = COALESCE($4::jsonb, notes), learning_language = COALESCE($5, learning_language), updated_at = now() WHERE id = $1 RETURNING ${userColumns}`, [req.userId, input.name ?? null, input.avatarUrl ?? null, input.notes === undefined ? null : JSON.stringify(input.notes), input.learningLanguage ?? null])).rows[0];
     if (!user) return res.status(404).json({ error: { code: "USER_NOT_FOUND", message: "Account not found" } });
     res.set("Cache-Control", "no-store");
     return res.json({ user: publicUser(user) });

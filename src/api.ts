@@ -12,6 +12,7 @@ export type Account = {
   name: string;
   avatarUrl?: string;
   plan: "free" | "premium";
+  learningLanguage: "en" | "ar";
 };
 
 export type RemoteLesson = {
@@ -25,14 +26,14 @@ export type RemoteLesson = {
     type: "heading" | "paragraph" | "vocabulary";
     title?: string;
     text?: string;
-    items?: Array<{ german: string; translation: string }>;
+    items?: Array<{ german: string; translations: { en: string; ar: string } }>;
   }>;
   exercises: Array<{
     id: string;
     kind: "multiple_choice";
     prompt: string;
-    options: string[];
-    explanation: string;
+    options: Array<{ id: string; translations: { en: string; ar: string } }>;
+    explanation: { en: string; ar: string };
     points: number;
   }>;
 };
@@ -94,6 +95,10 @@ export async function getCurrentAccount() {
   return request<{ user: Account }>("/me/profile");
 }
 
+export async function updateLearningLanguage(learningLanguage: "en" | "ar") {
+  return request<{ user: Account }>("/me/profile", { method: "PATCH", body: JSON.stringify({ learningLanguage }) });
+}
+
 export async function refreshCsrfToken() {
   const result = await request<{ csrfToken: string }>("/auth/csrf");
   csrfToken = result.csrfToken;
@@ -115,7 +120,7 @@ export async function getRemoteLesson(slug: string) {
 }
 
 export async function submitAttempt(slug: string, exerciseId: string, answer: string) {
-  return request<{ result: { correct: boolean; score: number; explanation: string }; progress: { status: string; bestScore: number; completedAt?: string } }>(
+  return request<{ result: { correct: boolean; score: number; explanation: { en: string; ar: string } }; progress: { status: string; bestScore: number; completedAt?: string } }>(
     `/lessons/${encodeURIComponent(slug)}/attempts`,
     { method: "POST", body: JSON.stringify({ exerciseId, answer }) },
   );

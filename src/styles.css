@@ -500,3 +500,6 @@ button:disabled {
     flex-direction: column;
   }
 }
+
+.language-select { display: flex; align-items: center; gap: 7px; color: #aebbb0; font-size: 12px; font-weight: 700; }
+.language-select select { border: 1px solid #ffffff25; border-radius: 8px; background: #0c1d16; color: #f4f7ef; padding: 7px 9px; font: inherit; }

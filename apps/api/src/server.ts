@@ -16,10 +16,11 @@ import { lessonsRouter } from "./routes/lessons.js";
 import { meRouter } from "./routes/me.js";
 import { clearSessionCookie, setSessionCookie } from "./services/sessionCookies.js";
 import { createSession, revokeSession, rotateCsrfToken } from "./services/sessions.js";
+import { syncCatalog } from "./seed.js";
 
 export const app = express();
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
-const userColumns = "id, email, password_hash, email_verified, verification_token_hash, verification_token_expires_at, name, avatar_url, notes, plan, created_at";
+const userColumns = "id, email, password_hash, email_verified, verification_token_hash, verification_token_expires_at, name, avatar_url, notes, learning_language, plan, created_at";
 app.disable("x-powered-by");
 app.set("trust proxy", env.TRUST_PROXY);
 app.use(helmet());
@@ -143,4 +144,5 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
 
 export async function initializeApp() {
   await migrate();
+  await syncCatalog();
 }

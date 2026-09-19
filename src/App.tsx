@@ -31,6 +31,7 @@ import {
   submitAttempt,
   type Account,
   type RemoteLesson,
+  updateLearningLanguage,
 } from "./api";
 import brandLogo from "./assets/deutschio-logo.png";
 import { courses, getCourse, getLesson, type Course, type Lesson, type LessonStatus } from "./content";
@@ -139,6 +140,7 @@ export function App() {
   const [completed, setCompleted] = useState<string[]>(readCompletedLessons);
   const [account, setAccount] = useState<Account | null>(null);
   const [premium, setPremium] = useState(false);
+  const [learningLanguage, setLearningLanguage] = useState<"en" | "ar">(() => window.localStorage.getItem("deutschio.learningLanguage") === "ar" ? "ar" : "en");
   const [sessionReady, setSessionReady] = useState(false);
   const selectedCourse = getCourse(selectedCourseCode);
   const selectedLesson = getLesson(selectedCourse, selectedLessonId);
@@ -159,6 +161,7 @@ export function App() {
         if (!active) return;
         setAccount(result.user);
         setPremium(result.user.plan === "premium");
+        setLearningLanguage(result.user.learningLanguage);
         await refreshCsrfToken();
         if (active) await refreshAccountData();
       } catch (error) {
@@ -175,6 +178,10 @@ export function App() {
   useEffect(() => {
     window.localStorage.setItem("deutschio.completedLessons", JSON.stringify(completed));
   }, [completed]);
+
+  useEffect(() => {
+    window.localStorage.setItem("deutschio.learningLanguage", learningLanguage);
+  }, [learningLanguage]);
 
   useEffect(() => {
     const restoreRoute = () => {
@@ -225,8 +232,14 @@ export function App() {
   const handleSignedIn = (nextAccount: Account) => {
     setAccount(nextAccount);
     setPremium(nextAccount.plan === "premium");
+    setLearningLanguage(nextAccount.learningLanguage);
     void refreshAccountData().catch(() => undefined);
     show("dashboard");
+  };
+
+  const changeLearningLanguage = (nextLanguage: "en" | "ar") => {
+    setLearningLanguage(nextLanguage);
+    if (account) void updateLearningLanguage(nextLanguage).then((result) => setAccount(result.user)).catch(() => undefined);
   };
 
   const handleSignOut = async () => {
@@ -243,11 +256,11 @@ export function App() {
   };
 
   return <main>
-    <Header view={view} menuOpen={menuOpen} signedIn={signedIn} account={account} onMenu={() => setMenuOpen((open) => !open)} onNavigate={show} onSignOut={() => void handleSignOut()} />
+    <Header view={view} menuOpen={menuOpen} signedIn={signedIn} account={account} learningLanguage={learningLanguage} onLanguageChange={changeLearningLanguage} onMenu={() => setMenuOpen((open) => !open)} onNavigate={show} onSignOut={() => void handleSignOut()} />
     {view === "home" && <Home onNavigate={show} onOpenCourse={openCourse} />}
     {view === "dashboard" && <Dashboard completed={completed} account={account} sessionReady={sessionReady} onOpenCourse={openCourse} onOpenLesson={openLesson} onNavigate={show} />}
     {view === "course" && <CourseMap course={selectedCourse} completed={completed} premium={premium} onBack={() => show("dashboard")} onOpenLesson={openLesson} onNavigate={show} />}
-    {view === "lesson" && selectedLesson && <LessonPlayer course={selectedCourse} lesson={selectedLesson} signedIn={signedIn} onBack={() => show("course")} onComplete={() => { completeLesson(selectedLesson.id); show("course"); }} />}
+    {view === "lesson" && selectedLesson && <LessonPlayer course={selectedCourse} lesson={selectedLesson} signedIn={signedIn} learningLanguage={learningLanguage} onBack={() => show("course")} onComplete={() => { completeLesson(selectedLesson.id); show("course"); }} />}
     {view === "pricing" && <Pricing onNavigate={show} />}
     {(view === "login" || view === "signup") && <AuthScreen mode={view} onNavigate={show} onSignedIn={handleSignedIn} />}
     <Footer onNavigate={show} />
@@ -258,7 +271,7 @@ function BrandLogo() {
   return <img className="brand-logo" src={brandLogo} alt="Deutschio" />;
 }
 
-function Header({ view, menuOpen, signedIn, account, onMenu, onNavigate, onSignOut }: { view: View; menuOpen: boolean; signedIn: boolean; account: Account | null; onMenu: () => void; onNavigate: (view: View) => void; onSignOut: () => void }) {
+function Header({ view, menuOpen, signedIn, account, learningLanguage, onLanguageChange, onMenu, onNavigate, onSignOut }: { view: View; menuOpen: boolean; signedIn: boolean; account: Account | null; learningLanguage: "en" | "ar"; onLanguageChange: (language: "en" | "ar") => void; onMenu: () => void; onNavigate: (view: View) => void; onSignOut: () => void }) {
   return <header className="nav shell">
     <button className="brand brand-button" onClick={() => onNavigate("home")} aria-label="Deutschio home"><BrandLogo /></button>
     <button className="menu-button" onClick={onMenu} aria-label="Toggle navigation" aria-expanded={menuOpen}>{menuOpen ? <X /> : <Menu />}</button>
@@ -266,6 +279,7 @@ function Header({ view, menuOpen, signedIn, account, onMenu, onNavigate, onSignO
       <button className={view === "dashboard" ? "nav-active" : ""} onClick={() => onNavigate("dashboard")}>My learning</button>
       <button onClick={() => onNavigate("home")}>Courses</button>
       <button className={view === "pricing" ? "nav-active" : ""} onClick={() => onNavigate("pricing")}>Pricing</button>
+      <label className="language-select">Learning language <select value={learningLanguage} onChange={(event) => onLanguageChange(event.target.value as "en" | "ar")}><option value="en">English</option><option value="ar">العربية</option></select></label>
       {signedIn ? <button className="text-button" onClick={() => onNavigate("dashboard")}>{account?.name || "My account"}</button> : <button className="text-button" onClick={() => onNavigate("login")}>Sign in</button>}
       {signedIn ? <button className="primary-button compact" onClick={() => onNavigate("dashboard")}>Continue</button> : <button className="primary-button compact" onClick={() => onNavigate("signup")}>Start free</button>}
       {signedIn && <button className="text-button" onClick={onSignOut}>Sign out</button>}
@@ -305,13 +319,13 @@ function CourseMap({ course, completed, premium, onBack, onOpenLesson, onNavigat
   return <section className="course-page shell"><button className="back-button" onClick={onBack}><ArrowLeft /> Back to dashboard</button><header className="course-hero" style={{ "--course-accent": course.accent } as CSSProperties}><div><p className="eyebrow">{course.code} · {course.access === "premium" ? "Premium" : "Included free"}</p><h1>{course.title}</h1><p>{course.description}</p></div><div className="course-hero-progress"><span>{progress.done} / {progress.total}</span><strong>Lessons complete</strong><div className="progress-bar"><span style={{ width: `${progress.percent}%` }} /></div></div></header><div className="course-units">{course.units.map((unit, unitIndex) => <section className="unit-card" key={unit.id}><div className="unit-heading"><span>Unit {unitIndex + 1}</span><div><h2>{unit.title}</h2><p>{unit.outcome}</p></div></div><div className="lesson-list">{unit.lessons.map((lesson) => { const status = lessonStatus(course, lesson, completed, premium); return <button className={`lesson-row ${status}`} key={lesson.id} onClick={() => onOpenLesson(lesson)}><span className="lesson-status"><StatusIcon status={status} /></span><span className="lesson-row-copy"><strong>{lesson.title}</strong><small>{lesson.description}</small></span><span className="lesson-duration"><Clock3 /> {lesson.duration} min</span>{status === "locked" ? <Crown className="premium-icon" /> : <ChevronRight />}</button>; })}</div></section>)}</div>{course.access === "premium" && !premium && <aside className="premium-gate"><Crown /><div><p>Unlock {course.code} and every course</p><h2>Make German your everyday language.</h2><span>Unlimited lessons, reviews and learning insights from one premium plan.</span></div><button className="primary-button" onClick={() => onNavigate("pricing")}>See Premium <ArrowRight /></button></aside>}</section>;
 }
 
-function LessonPlayer({ course, lesson, signedIn, onBack, onComplete }: { course: Course; lesson: Lesson; signedIn: boolean; onBack: () => void; onComplete: () => void }) {
+function LessonPlayer({ course, lesson, signedIn, learningLanguage, onBack, onComplete }: { course: Course; lesson: Lesson; signedIn: boolean; learningLanguage: "en" | "ar"; onBack: () => void; onComplete: () => void }) {
   const [remoteLesson, setRemoteLesson] = useState<RemoteLesson | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const [checking, setChecking] = useState(false);
   const [attemptError, setAttemptError] = useState<string | null>(null);
-  const [serverResult, setServerResult] = useState<{ correct: boolean; explanation: string } | null>(null);
+  const [serverResult, setServerResult] = useState<{ correct: boolean; explanation: { en: string; ar: string } } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -336,11 +350,12 @@ function LessonPlayer({ course, lesson, signedIn, onBack, onComplete }: { course
   const localPrompt = prompts[lesson.id] ?? fallbackPrompt;
   const remoteExercise = remoteLesson?.exercises[0];
   const prompt: PracticePrompt = remoteExercise
-    ? { german: remoteExercise.prompt, translation: "", options: remoteExercise.options, tip: remoteExercise.explanation }
+    ? { german: remoteExercise.prompt, translation: "", options: remoteExercise.options.map((option) => option.id), tip: remoteExercise.explanation[learningLanguage] }
     : localPrompt;
-  const vocabulary = remoteLesson?.blocks.flatMap((block) => block.items?.map((item) => item.german) ?? []) ?? lesson.vocabulary;
+  const options = remoteExercise ? remoteExercise.options.map((option) => ({ value: option.id, label: option.translations[learningLanguage] })) : prompt.options.map((option) => ({ value: option, label: option }));
+  const vocabulary = remoteLesson?.blocks.flatMap((block) => block.items ?? []) ?? lesson.vocabulary.map((german) => ({ german, translations: { en: german, ar: german } }));
   const correct = serverResult?.correct ?? selected === prompt.translation;
-  const explanation = serverResult?.explanation ?? prompt.tip;
+  const explanation = serverResult?.explanation[learningLanguage] ?? prompt.tip;
 
   const checkAnswer = async () => {
     if (!selected) return;
@@ -378,21 +393,21 @@ function LessonPlayer({ course, lesson, signedIn, onBack, onComplete }: { course
       {remoteLesson.blocks.map((block, index) => <div className="lesson-content-block" key={`${block.type}-${block.title ?? block.text ?? index}`}>
         {block.type === "heading" && block.title ? <h2>{block.title}</h2> : null}
         {block.type === "paragraph" && block.text ? <p>{block.text}</p> : null}
-        {block.type === "vocabulary" && block.items ? <dl>{block.items.map((item) => <div key={item.german}><dt>{item.german}</dt><dd>{item.translation}</dd></div>)}</dl> : null}
+        {block.type === "vocabulary" && block.items ? <dl>{block.items.map((item) => <div key={item.german}><dt>{item.german}</dt><dd>{item.translations[learningLanguage]}</dd></div>)}</dl> : null}
       </div>)}
     </section> : null}
     <article className="lesson-stage">
       <p className="eyebrow">Listen and choose the matching phrase</p>
       <button type="button" className="audio-button" onClick={() => speakGerman(prompt.german)} aria-label={`Play pronunciation for ${prompt.german}`}><Volume2 /></button>
       <h1>{prompt.german}</h1>
-      <p className="lesson-instruction">Choose the most natural English meaning.</p>
-      <div className="answer-options">{prompt.options.map((option) => <button type="button" key={option} className={`${selected === option ? "selected" : ""} ${checked && correct && (remoteLesson ? option === selected : option === prompt.translation) ? "correct" : ""} ${checked && selected === option && !correct ? "incorrect" : ""}`} disabled={checked || checking} onClick={() => setSelected(option)}><span>{option}</span>{checked && correct && (remoteLesson ? option === selected : option === prompt.translation) && <Check />}</button>)}</div>
+      <p className="lesson-instruction">Choose the most natural {learningLanguage === "ar" ? "Arabic" : "English"} meaning.</p>
+      <div className="answer-options">{options.map((option) => <button type="button" key={option.value} className={`${selected === option.value ? "selected" : ""} ${checked && correct && (remoteLesson ? option.value === selected : option.value === prompt.translation) ? "correct" : ""} ${checked && selected === option.value && !correct ? "incorrect" : ""}`} disabled={checked || checking} onClick={() => setSelected(option.value)}><span>{option.label}</span>{checked && correct && (remoteLesson ? option.value === selected : option.value === prompt.translation) && <Check />}</button>)}</div>
       {attemptError && <p className="auth-message error" role="alert">{attemptError}</p>}
       {checked ? <div className={`feedback ${correct ? "success" : "retry"}`}><div>{correct ? <CheckCircle2 /> : <Sparkles />}</div><div><strong>{correct ? "Exactly right." : "Almost — keep going."}</strong><p>{correct ? explanation : remoteLesson ? explanation : `The correct answer is “${prompt.translation}”. ${explanation}`}</p></div></div> : null}
       <div className="lesson-actions">{checked ? correct ? <button className="primary-button" onClick={onComplete}>Finish lesson <ArrowRight /></button> : <button className="secondary-button" onClick={retry}>Try again <ArrowRight /></button> : <button className="primary-button" disabled={!selected || checking} onClick={() => void checkAnswer()}>{checking ? "Saving answer…" : "Check answer"}<ArrowRight /></button>}</div>
       {!signedIn && <p className="lesson-save-note">Create a free account to save your lesson progress across devices.</p>}
     </article>
-    <aside className="lesson-vocabulary"><span>In this lesson</span>{vocabulary.map((word) => <span key={word}>{word}</span>)}</aside>
+    <aside className="lesson-vocabulary"><span>In this lesson</span>{vocabulary.map((item) => <span key={item.german}>{item.german} · {item.translations[learningLanguage]}</span>)}</aside>
   </section>;
 }
 
