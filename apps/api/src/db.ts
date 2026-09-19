@@ -19,7 +19,7 @@ const isServerless =
   process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined;
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
-  ssl: usesLocalPostgres ? false : { rejectUnauthorized: true },
+  ssl: usesLocalPostgres ? false : { rejectUnauthorized: true, ...(env.DATABASE_CA ? { ca: env.DATABASE_CA } : {}) },
   // Serverless runtimes can create multiple warm instances. A small pool per
   // instance keeps the shared Supabase connection limit healthy as traffic
   // grows, while local development still has a comfortable pool size.
