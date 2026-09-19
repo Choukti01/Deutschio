@@ -26,8 +26,17 @@ app.set("trust proxy", env.TRUST_PROXY);
 app.use(helmet());
 app.use(cors({ origin(origin, callback) { if (!origin || env.CORS_ORIGINS.includes(origin)) return callback(null, true); return callback(new ApiError(403, "CORS_ORIGIN_DENIED", "Request origin is not allowed")); }, credentials: true, methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"], maxAge: 600 }));
 app.use(express.json({ limit: "100kb" }));
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false });
-const verificationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false });
+// Netlify's serverless request bridge does not always populate Express's
+// `request.ip`. Use its platform connection header when present, otherwise a
+// stable anonymous fingerprint, so rate limiting remains active instead of
+// failing the authentication route before it reaches validation.
+function rateLimitKey(req: express.Request) {
+  const platformIp = req.get("x-nf-client-connection-ip") ?? req.ip;
+  if (platformIp) return `ip:${platformIp}`;
+  return `anonymous:${crypto.createHash("sha256").update(req.get("user-agent") ?? "unknown").digest("hex")}`;
+}
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: "draft-7", legacyHeaders: false, keyGenerator: rateLimitKey });
+const verificationLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: "draft-7", legacyHeaders: false, keyGenerator: rateLimitKey });
 const emailSchema = z.object({ email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()) });
 const passwordSchema = z.string().min(12, "Use at least 12 characters for your password").max(128);
 // Existing accounts may have been created under the previous 10-character
