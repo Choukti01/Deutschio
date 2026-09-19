@@ -8,7 +8,7 @@ import jwt from "jsonwebtoken";
 import { Resend } from "resend";
 import { z } from "zod";
 import { env } from "./config.js";
-import { id, migrate, pool, publicUser, query, type UserRow } from "./db.js";
+import { assertDatabaseRuntimeConfiguration, id, migrate, pool, publicUser, query, type UserRow } from "./db.js";
 import { ApiError } from "./errors.js";
 import { requireAuth, requireCsrf, type AuthenticatedRequest } from "./middleware/auth.js";
 import { coursesRouter } from "./routes/courses.js";
@@ -143,6 +143,7 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
 });
 
 export async function initializeApp() {
+  assertDatabaseRuntimeConfiguration();
   await migrate();
   await syncCatalog();
 }

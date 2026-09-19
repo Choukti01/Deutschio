@@ -28,6 +28,15 @@ export const pool = new Pool({
   connectionTimeoutMillis: 10_000,
 });
 
+export function assertDatabaseRuntimeConfiguration() {
+  // A loopback address is valid for local development, but in a deployed
+  // serverless function it refers to the function container itself. Failing
+  // early gives deploy logs an actionable cause instead of a connection timeout.
+  if (env.NODE_ENV === "production" && usesLocalPostgres) {
+    throw new Error("DATABASE_URL must point to a hosted PostgreSQL service in production, not localhost or 127.0.0.1.");
+  }
+}
+
 export function id() { return randomUUID(); }
 
 export async function query<T extends QueryResultRow = QueryResultRow>(text: string, values: unknown[] = []) {
