@@ -1,5 +1,4 @@
 import "dotenv/config";
-import { fileURLToPath } from "node:url";
 import { a1Lessons } from "./content/a1.js";
 import { a2Lessons } from "./content/a2.js";
 import { b1Lessons } from "./content/b1.js";
@@ -35,6 +34,9 @@ async function run() {
   console.log("Synced Deutschio PostgreSQL learning catalog");
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// Netlify bundles this module into a CommonJS function, where import.meta.url
+// is unavailable. Checking the executable filename keeps the standalone seed
+// command working without evaluating ESM-only metadata during function startup.
+if (/[\\/]seed\.(?:ts|js)$/i.test(process.argv[1] ?? "")) {
   run().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => { await pool.end(); });
 }
